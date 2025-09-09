@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  # Local SQS service using ElasticMQ
+  sqs:
+    image: softwaremill/elasticmq-native:1.5.7
+    ports:
+      - "9324:9324"
+      - "9325:9325"
+    volumes:
+      - ./elasticmq.conf:/opt/elasticmq.conf
+    command: ["/opt/elasticmq-server", "-Dconfig.file=/opt/elasticmq.conf"]
+
+  # Trigger service that sends random increment requests
+  trigger-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.trigger
+    environment:
+      - SQS_ENDPOINT=http://sqs:9324
+      - TARGET_NODES=lambda-1,lambda-2,lambda-3,lambda-4,lambda-5
+      - MIN_INTERVAL_SECONDS=5
+      - MAX_INTERVAL_SECONDS=30
+    depends_on:
+      - sqs
+    volumes:
+      - ./logs:/app/logs
+
+  # Lambda nodes (would be defined when other tasks are complete)
+  # lambda-1:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile.lambda
+  #   environment:
+  #     - NODE_ID=lambda-1
+  #     - SQS_ENDPOINT=http://sqs:9324
+  #   depends_on:
+  #     - sqs
+
+networks:
+  default:
+    name: consensus-network
